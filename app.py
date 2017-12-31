@@ -3,11 +3,10 @@ import os
 
 import datetime
 from flask import Flask, abort, request, jsonify, g, url_for, flash, render_template
-#from flask_login import login_required
-from flask_login import login_required, current_user
 from flask_mail import Message, Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
+from flask_login import login_required, current_user
 from passlib.apps import custom_app_context as pwd_context
 from itsdangerous import (TimedJSONWebSignatureSerializer
                           as Serializer, BadSignature, SignatureExpired, URLSafeTimedSerializer)
@@ -32,7 +31,7 @@ auth = HTTPBasicAuth()
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(32), index=True)
+    email = db.Column(db.String(32), index=True)
     password_hash = db.Column(db.String(64))
     registered_on = db.Column(db.DateTime, nullable=False)
     confirmed = db.Column(db.Boolean, nullable=False, default=False)
@@ -56,9 +55,8 @@ class User(db.Model):
 
 
 @auth.verify_password
-def verify_password(username, password):
-
-    user = User.query.filter_by(username=username).first()
+def verify_password(email, password):
+    user = User.query.filter_by(email=email).first()
     if not user or not user.verify_password(password):
         return False
     g.user = user
@@ -78,8 +76,7 @@ def new_user():
     user = User(email, password, confirmed=False)
     db.session.add(user)
     db.session.commit()
-  #  return (jsonify({'email': user.email}), 201,
-  #          {'Location': url_for('get_user', id=user.id, _external=True)})
+
 
 
 @app.route('/api/users/<int:id>')
@@ -118,7 +115,7 @@ def send_confirmation(email):
     token = generate_confirmation_token(email)
     confirm_url = url_for('user.confirm_email', token=token, _external=True)
 
-    html = "<p>Welcome! Thanks for signing up. Please follow this link to activate your account:</p>\
+    html = "<p>Hey! Thanks for signing up. Please follow this link to activate your account:</p>\
     <p><a href={}</a></p>\
     <br>\
     <p>Cheers!</p>".format(confirm_url)
@@ -146,18 +143,6 @@ def confirm_token(token, expiration=3600):
         return False
     return email
 
-
-def confirm_token(token, expiration=3600):
-    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-    try:
-        email = serializer.loads(
-            token,
-            salt=app.config['SECURITY_PASSWORD_SALT'],
-            max_age=expiration
-        )
-    except:
-        return False
-    return email
 
 @app.route('/confirm/<token>')
 @login_required
