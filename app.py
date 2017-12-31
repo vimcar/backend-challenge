@@ -62,7 +62,7 @@ def verify_password(email, password):
     g.user = user
     return True
 
-
+#user registration
 @app.route('/api/users', methods=['POST'])
 def new_user():
     email = request.json.get('email')
@@ -76,7 +76,7 @@ def new_user():
     user = User(email, password, confirmed=False)
     db.session.add(user)
     db.session.commit()
-
+    send_confirmation(email)
 
 
 @app.route('/api/users/<int:id>')
