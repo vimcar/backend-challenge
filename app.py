@@ -4,6 +4,7 @@ import os
 import datetime
 from flask import Flask, abort, request, jsonify, g, url_for, flash, render_template
 #from flask_login import login_required
+from flask_login import login_required, current_user
 from flask_mail import Message, Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
@@ -33,9 +34,18 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(32), index=True)
     password_hash = db.Column(db.String(64))
+    registered_on = db.Column(db.DateTime, nullable=False)
+    confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    confirmed_on = db.Column(db.DateTime, nullable=True)
+    password_reset_token = db.Column(db.String, nullable=True)
 
-    def hash_password(self, password):
-        self.password_hash = pwd_context.encrypt(password)
+    def __init__(self, email, password, confirmed,
+                 confirmed_on=None):
+        self.email = email
+        self.password = pwd_context.encrypt(password)
+        self.registered_on = datetime.datetime.now()
+        self.confirmed = confirmed
+        self.confirmed_on = confirmed_on
 
     def verify_password(self, password):
         return pwd_context.verify(password, self.password_hash)
@@ -43,17 +53,6 @@ class User(db.Model):
     def verify_email(email):
         return validate_email(email,check_mx=True)
 
-    @staticmethod
-    def verify_auth_token(token):
-        s = Serializer(app.config['SECRET_KEY'])
-        try:
-            data = s.loads(token)
-        except SignatureExpired:
-            return None    # valid token, but expired
-        except BadSignature:
-            return None    # invalid token
-        user = User.query.get(data['id'])
-        return user
 
 
 @auth.verify_password
@@ -68,20 +67,19 @@ def verify_password(username, password):
 
 @app.route('/api/users', methods=['POST'])
 def new_user():
-    username = request.json.get('username')
+    email = request.json.get('email')
     password = request.json.get('password')
-    if username is None or password is None:
+    if email is None or password is None:
         abort(400)    # missing arguments
-    if User.query.filter_by(username=username).first() is not None:
+    if User.query.filter_by(email=email).first() is not None:
         abort(400)    # existing user
-    if not username.verify_email(username):
+    if not email.verify_email(email):
         abort(400)   # not valid email
-    user = User(username=username)
-    user.hash_password(password)
+    user = User(email, password, confirmed=False)
     db.session.add(user)
     db.session.commit()
-    return (jsonify({'username': user.username}), 201,
-            {'Location': url_for('get_user', id=user.id, _external=True)})
+  #  return (jsonify({'email': user.email}), 201,
+  #          {'Location': url_for('get_user', id=user.id, _external=True)})
 
 
 @app.route('/api/users/<int:id>')
@@ -89,7 +87,7 @@ def get_user(id):
     user = User.query.get(id)
     if not user:
         abort(400)
-    return jsonify({'username': user.username})
+    return jsonify({'email': user.email})
 
 
 @app.route('/api/token')
@@ -102,7 +100,7 @@ def get_auth_token():
 @app.route('/api/resource')
 @auth.login_required
 def get_resource():
-    return jsonify({'data': 'Hello, %s!' % g.user.username})
+    return jsonify({'data': 'Hello, %s!' % g.user.email})
 
 @app.route("/")
 def send_email(to, subject, template):
@@ -160,6 +158,25 @@ def confirm_token(token, expiration=3600):
     except:
         return False
     return email
+
+@app.route('/confirm/<token>')
+@login_required
+def confirm_email(token):
+    if current_user.confirmed:
+        flash('Account already confirmed. Please login.', 'success')
+        return redirect(url_for('main.home'))
+    email = confirm_token(token)
+    user = User.query.filter_by(email=current_user.email).first_or_404()
+    if user.email == email:
+        user.confirmed = True
+        user.confirmed_on = datetime.datetime.now()
+        db.session.add(user)
+        db.session.commit()
+        flash('You have confirmed your account. Thanks!', 'success')
+    else:
+        flash('The confirmation link is invalid or has expired.', 'danger')
+    return redirect(url_for('main.home'))
+
 
 if __name__ == '__main__':
     if not os.path.exists('db.sqlite'):
