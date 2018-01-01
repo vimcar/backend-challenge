@@ -58,7 +58,8 @@ class User(db.Model):
 def verify_password(email, password):
     user = User.query.filter_by(email=email).first()
     if not user or not user.verify_password(password):
-        return False
+        abort(401) #can not log in
+        return jsonify({'User email or password incorrect. Access Denied.'})
     g.user = user
     return True
 
