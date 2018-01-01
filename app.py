@@ -53,8 +53,8 @@ class User(db.Model):
         return validate_email(email,check_mx=True)
 
 
-
-@auth.verify_password
+#user log in
+@auth.verify_password('/api/users/login')
 def verify_password(email, password):
     user = User.query.filter_by(email=email).first()
     if not user or not user.verify_password(password):
@@ -63,8 +63,8 @@ def verify_password(email, password):
     g.user = user
     return True
 
-#user registration
-@app.route('/api/users', methods=['POST'])
+#user sign up
+@app.route('/api/users/signup', methods=['POST'])
 def new_user():
     email = request.json.get('email')
     password = request.json.get('password')
@@ -78,7 +78,7 @@ def new_user():
     db.session.add(user)
     db.session.commit()
     send_confirmation(email)
-
+    return jsonify({'Please check you email to confirm registration.'})
 
 @app.route('/api/users/<int:id>')
 def get_user(id):
