@@ -116,10 +116,10 @@ def send_confirmation(email):
     token = generate_confirmation_token(email)
     confirm_url = url_for('user.confirm_email', token=token, _external=True)
 
-    html = "<p>Hey! Thanks for signing up. Please follow this link to activate your account:</p>\
+    html = "<p>Hello! Thanks for signing up. Please follow this link to activate your account:</p>\
     <p><a href={}</a></p>\
     <br>\
-    <p>Cheers!</p>".format(confirm_url)
+    <p>Regards!</p>".format(confirm_url)
 
     subject = "Please confirm your email"
     send_email(email, subject, html)
