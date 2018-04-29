@@ -20,7 +20,7 @@ The challenge is to create a simple (preferably [Flask](http://flask.pocoo.org/)
 
 
 #### Authorization
-- the user can access a protected resource only if he has been authenticated
+- the user can access a protected resource only if they have been authenticated
 - anonymous access to these resources may not be possible
 
 
